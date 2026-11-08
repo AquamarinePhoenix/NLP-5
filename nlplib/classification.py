@@ -147,8 +147,8 @@ def run_emotion_classification(
             random_state=42,
             n_jobs=-1,
         )
-        forest.fit(train_dense, split["train_labels"])
-        forest_predictions = forest.predict(test_dense)
+        forest.fit(train_features, split["train_labels"])
+        forest_predictions = forest.predict(test_features)
         forest_metrics = _classification_metrics(
             split["test_labels"],
             forest_predictions,
@@ -168,8 +168,8 @@ def run_emotion_classification(
         )
         write_log(
             f"{representation_name} random forest statistics: "
-            f"classes={len(labels)}, train_rows={train_dense.shape[0]}, "
-            f"test_rows={test_dense.shape[0]}, features={train_dense.shape[1]}, "
+            f"classes={len(labels)}, train_rows={train_features.shape[0]}, "
+            f"test_rows={test_features.shape[0]}, features={train_features.shape[1]}, "
             f"trees={forest.n_estimators}, max_depth={forest.max_depth}, "
             f"max_features={forest.max_features}, "
             f"min_samples_leaf={forest.min_samples_leaf}, "

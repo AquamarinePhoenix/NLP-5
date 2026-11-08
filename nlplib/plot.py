@@ -187,13 +187,14 @@ def plot_umap_representations(
             if issparse(train_embeddings) or issparse(test_embeddings)
             else np.concatenate((train_embeddings, test_embeddings))
         )
-        if len(embeddings) < 3:
+        sample_count = embeddings.shape[0]
+        if sample_count < 3:
             continue
 
         reducer = umap.UMAP(
             n_components=2,
             metric="cosine",
-            n_neighbors=min(10, len(embeddings) - 1),
+            n_neighbors=min(10, sample_count - 1),
             n_epochs=50,
             low_memory=True,
             angular_rp_forest=True,
