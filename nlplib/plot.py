@@ -4,9 +4,11 @@ matplotlib.use("Agg")
 
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
+import numpy as np
 from collections import Counter, defaultdict
 from pathlib import Path
 from wordcloud import WordCloud
+import umap
 from nlplib.config import COLORS
 
 THEME_BACKGROUND = "#f2f2f2"
@@ -159,3 +161,63 @@ def plot_pos_distribution(
     if show:
         plt.show()
     plt.close(figure)
+
+
+def plot_umap_representations(
+    representations: dict,
+    split: dict[str, list[str]],
+    output_directory: str = "data/output/umap",
+    show: bool = False,
+    save: bool = True,
+) -> None:
+    labels = split["train_labels"] + split["test_labels"]
+    output_path = Path(output_directory)
+    if save:
+        output_path.mkdir(parents=True, exist_ok=True)
+
+    representation_sets = (
+        ("frequency", representations["tfidf_train"], representations["tfidf_test"]),
+        ("static", representations["static_train"], representations["static_test"]),
+        ("contextual", representations["contextual_train"], representations["contextual_test"]),
+    )
+    for model_type, train_embeddings, test_embeddings in representation_sets:
+        embeddings = np.concatenate((
+            train_embeddings.toarray() if hasattr(train_embeddings, "toarray") else train_embeddings,
+            test_embeddings.toarray() if hasattr(test_embeddings, "toarray") else test_embeddings,
+        ))
+        if len(embeddings) < 3:
+            continue
+
+        reducer = umap.UMAP(
+            n_components=2,
+            metric="cosine",
+            n_neighbors=min(10, len(embeddings) - 1),
+            n_epochs=50,
+            low_memory=True,
+            angular_rp_forest=True,
+            n_jobs=-1,
+        )
+        coordinates = reducer.fit_transform(embeddings)
+        figure, axes = plt.subplots(figsize=(10, 7))
+        _style_axes(figure, axes)
+
+        for index, emotion in enumerate(sorted(set(labels))):
+            selected = [label == emotion for label in labels]
+            axes.scatter(
+                coordinates[selected, 0],
+                coordinates[selected, 1],
+                label=emotion,
+                color=COLORS[index % len(COLORS)],
+                alpha=0.75,
+            )
+
+        _style_title(axes.set_title(f"UMAP projection: {model_type}"))
+        axes.set_xlabel("UMAP 1")
+        axes.set_ylabel("UMAP 2")
+        axes.legend(title="Emotion class")
+        figure.tight_layout()
+        if save:
+            figure.savefig(output_path / f"umap_{model_type}.png", dpi=150)
+        if show:
+            plt.show()
+        plt.close(figure)

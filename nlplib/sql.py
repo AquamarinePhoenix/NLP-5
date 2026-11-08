@@ -79,6 +79,31 @@ INSERT_TEXT_LENGTH_DISTRIBUTION: str = """
     GROUP BY EMOTION_LABEL, TEXT_LENGTH
 """
 
+CREATE_DIMENSION_EMBEDDINGS: str = """
+    CREATE TABLE IF NOT EXISTS dimEmbeddings (
+        ID__ INTEGER PRIMARY KEY AUTOINCREMENT,
+        TEXT_SAMPLE TEXT NULL,
+        EMBEDDING TEXT NULL,
+        MODEL_TYPE TEXT NULL,
+        IS_SPARSE INTEGER NOT NULL
+    );
+"""
+
+INSERT_EMBEDDINGS: str = """
+    INSERT INTO dimEmbeddings (
+        TEXT_SAMPLE,
+        EMBEDDING,
+        MODEL_TYPE,
+        IS_SPARSE
+    )
+    VALUES (
+        :text_sample,
+        :embedding,
+        :model_type,
+        :is_sparse
+    );
+"""
+
 FIND_TEXT_LENGTH_DISTRIBUTION = """
     SELECT
         B.EMOTION_DEFINITION,

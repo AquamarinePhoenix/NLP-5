@@ -1,12 +1,5 @@
-from nlplib.config import DATA_FILE
-
-EMOTIONS = [
-    {"emotion_label": "D", "emotion_definition": "Džiaugsmas"},
-    {"emotion_label": "L", "emotion_definition": "Liudesys"},
-    {"emotion_label": "N", "emotion_definition": "Nuostaba"},
-    {"emotion_label": "P", "emotion_definition": "Pyktis"},
-    {"emotion_label": "Z", "emotion_definition": "Neutrali"}
-]
+from nlplib.config import DATA_FILE, TEST, TEST_ROWS
+import random
 
 def read_raw_data(encoding: str | None = "utf-8") -> list[dict[str, str]]:
     with open(DATA_FILE, "r", encoding=encoding) as f:
@@ -19,3 +12,34 @@ def read_raw_data(encoding: str | None = "utf-8") -> list[dict[str, str]]:
             for line in f
             if line.strip()
         ]
+
+def prepare_data():
+
+    data = read_raw_data()
+
+    if TEST:
+        classes = sorted({row["emotion_label"] for row in data})
+
+        if len(classes) >= 2:
+            selected_classes = random.Random(42).sample(classes, 2)
+            rows_per_class = TEST_ROWS // 2
+            selected_data = []
+
+            for emotion_class in selected_classes:
+                class_rows = [
+                    row for row in data
+                    if row["emotion_label"] == emotion_class
+                ]
+                selected_data.extend(class_rows[:rows_per_class])
+
+            if TEST_ROWS % 2:
+                remainder_rows = [
+                    row
+                    for row in data
+                    if row["emotion_label"] == selected_classes[0]
+                ][rows_per_class:rows_per_class + 1]
+                selected_data.extend(remainder_rows)
+
+            data = selected_data
+
+    return data

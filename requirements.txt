@@ -2,3 +2,7 @@ matplotlib
 pandas
 spacy
 wordcloud
+scikit-learn
+scipy
+sentence-transformers
+umap-learn

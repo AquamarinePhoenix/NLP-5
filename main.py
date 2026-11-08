@@ -1,6 +1,6 @@
 #%%
 from nlplib.log import clear_log, write_log
-from nlplib.data import read_raw_data, EMOTIONS
+from nlplib.data import prepare_data
 from nlplib.db import (
     get_connection,
     reset_table,
@@ -9,6 +9,8 @@ from nlplib.db import (
     get_transformed_text_by_emotion,
     get_text_by_emotion,
     get_text_length_distribution,
+    save_representations,
+    get_dataset_statistics,
 )
 from nlplib.sql import (
     CREATE_DIMENSION_METADATA,
@@ -21,14 +23,23 @@ from nlplib.sql import (
     INSERT_TEXT_LENGTH_DISTRIBUTION,
     sql_select_table
 )
-from nlplib.plot import plot_emotion_word_clouds, plot_line_chart, plot_pos_distribution
+from nlplib.plot import (
+    plot_emotion_word_clouds,
+    plot_line_chart,
+    plot_pos_distribution,
+    plot_umap_representations,
+)
 from nlplib.transform import get_pos_distribution, perform_preprocess
+from nlplib.features import extract_representations, stratified_text_split
+from nlplib.classification import run_emotion_classification
+from nlplib.config import EMOTIONS
 import pandas as pd
 #%%
 def main():
     #%%
+    #1. Text dataset preparation
     clear_log()
-    data = read_raw_data()
+    data = prepare_data()
     write_log(data)
 
     conn, cursor = get_connection()
@@ -61,8 +72,23 @@ def main():
         CREATE_DIMENSION_METADATA_GROUPED,
         INSERT_METADATA_GROUPED,
     )
+    dataset_statistics = get_dataset_statistics(conn, cursor)
+    write_log(
+        "Dataset statistics: "
+        f"raw_rows={dataset_statistics['raw_rows']}, "
+        f"unique_texts_after_grouping={dataset_statistics['unique_rows']}, "
+        f"duplicates_removed={dataset_statistics['duplicates_removed']}, "
+        f"multi_label_texts_excluded={dataset_statistics['multi_label_texts']}, "
+        f"class_distribution={dataset_statistics['class_distribution']}"
+    )
+    write_log(
+        "Multi-label handling: texts with multiple emotion labels are excluded "
+        "from analysis by dimMetadataGrouped; one label is retained per unique "
+        "text using FIRST_VALUE."
+    )
     write_metadata(conn,cursor)
-
+#%%
+    #2. Text Analysis
     reset_table(
         conn,
         cursor,
@@ -106,7 +132,54 @@ def main():
             f"{emotion}: "
             + ", ".join(f"{pos}={percentage:.2f}%" for _, pos, _, percentage in emotion_rows)
         )
-
+#%%
+    #3. Text Representation (Feature Extraction)
+    feature_rows = [
+        (emotion, text)
+        for emotion, _, text in get_text_by_emotion(conn, cursor)
+    ]
+    feature_split = stratified_text_split(feature_rows)
+    representations = extract_representations(feature_split)
+    save_representations(conn, cursor, feature_split, representations)
+    plot_umap_representations(representations, feature_split)
+    write_log(
+        "Feature extraction shapes: "
+        f"TF-IDF train={representations['tfidf_train'].shape}, "
+        f"test={representations['tfidf_test'].shape}; "
+        f"static train={representations['static_train'].shape}, "
+        f"test={representations['static_test'].shape}; "
+        f"contextual train={representations['contextual_train'].shape}, "
+        f"test={representations['contextual_test'].shape}"
+    )
+    for representation_name, train_features, test_features in (
+        ("frequency", representations["tfidf_train"], representations["tfidf_test"]),
+        ("static", representations["static_train"], representations["static_test"]),
+        ("contextual", representations["contextual_train"], representations["contextual_test"]),
+    ):
+        train_array = (
+            train_features.toarray()
+            if hasattr(train_features, "toarray")
+            else train_features
+        )
+        test_array = (
+            test_features.toarray()
+            if hasattr(test_features, "toarray")
+            else test_features
+        )
+        write_log(
+            f"{representation_name} representation report statistics: "
+            f"dimensions={train_array.shape[1]}, "
+            f"train_sparsity={1 - (train_array != 0).mean():.4f}, "
+            f"test_sparsity={1 - (test_array != 0).mean():.4f}; "
+            f"semantic_information={'surface term weighting' if representation_name == 'frequency' else 'distributional context' if representation_name == 'static' else 'contextual sentence semantics'}"
+        )
+#%%
+    #4. Emotion Classification
+    run_emotion_classification(
+        feature_split,
+        representations,
+    )
+    
 #%%
 if __name__ == "__main__":
     main()
