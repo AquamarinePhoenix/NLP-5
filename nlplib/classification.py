@@ -2,6 +2,7 @@ from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+from scipy.sparse import issparse
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.metrics import (
@@ -46,19 +47,17 @@ def check_logistic_regression_prerequisites(
             raise ValueError(f"{model_type} test rows do not match test labels")
         if train_shape[1] != test_shape[1]:
             raise ValueError(f"{model_type} train/test feature dimensions differ")
-        train_dense_features = (
-            train_features.toarray()
-            if hasattr(train_features, "toarray")
+        train_values = (
+            train_features.data
+            if issparse(train_features)
             else np.asarray(train_features)
         )
-        test_dense_features = (
-            test_features.toarray()
-            if hasattr(test_features, "toarray")
+        test_values = (
+            test_features.data
+            if issparse(test_features)
             else np.asarray(test_features)
         )
-        if not np.isfinite(train_dense_features).all() or not np.isfinite(
-            test_dense_features
-        ).all():
+        if not np.isfinite(train_values).all() or not np.isfinite(test_values).all():
             raise ValueError(f"{model_type} contains non-finite feature values")
 
     write_log(
@@ -98,17 +97,6 @@ def run_emotion_classification(
     matrices: list[tuple[str, str, np.ndarray]] = []
 
     for representation_name, train_features, test_features in representation_sets:
-        train_dense = (
-            train_features.toarray()
-            if hasattr(train_features, "toarray")
-            else np.asarray(train_features)
-        )
-        test_dense = (
-            test_features.toarray()
-            if hasattr(test_features, "toarray")
-            else np.asarray(test_features)
-        )
-
         logistic_classifier = LogisticRegression(
             max_iter=1000,
             solver="lbfgs",
@@ -136,8 +124,8 @@ def run_emotion_classification(
         )
         write_log(
             f"{representation_name} logistic regression statistics: "
-            f"classes={len(labels)}, train_rows={train_dense.shape[0]}, "
-            f"test_rows={test_dense.shape[0]}, features={train_dense.shape[1]}, "
+            f"classes={len(labels)}, train_rows={train_features.shape[0]}, "
+            f"test_rows={test_features.shape[0]}, features={train_features.shape[1]}, "
             f"iterations={logistic_classifier.n_iter_.tolist()}, "
             f"intercept={logistic_classifier.intercept_.tolist()}, "
             f"coefficient_shape={logistic_classifier.coef_.shape}"

@@ -5,6 +5,7 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import matplotlib.patheffects as pe
 import numpy as np
+from scipy.sparse import issparse, vstack
 from collections import Counter, defaultdict
 from pathlib import Path
 from wordcloud import WordCloud
@@ -181,10 +182,11 @@ def plot_umap_representations(
         ("contextual", representations["contextual_train"], representations["contextual_test"]),
     )
     for model_type, train_embeddings, test_embeddings in representation_sets:
-        embeddings = np.concatenate((
-            train_embeddings.toarray() if hasattr(train_embeddings, "toarray") else train_embeddings,
-            test_embeddings.toarray() if hasattr(test_embeddings, "toarray") else test_embeddings,
-        ))
+        embeddings = (
+            vstack((train_embeddings, test_embeddings))
+            if issparse(train_embeddings) or issparse(test_embeddings)
+            else np.concatenate((train_embeddings, test_embeddings))
+        )
         if len(embeddings) < 3:
             continue
 

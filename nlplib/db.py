@@ -2,6 +2,8 @@ import sqlite3
 import csv
 import json
 import numpy as np
+from collections.abc import Iterable
+from scipy.sparse import issparse
 from nlplib.config import DB_FILE, OUTPUT_FILE
 from nlplib.sql import (
     FIND_MULTIPLE_EMOTIONS,
@@ -26,7 +28,7 @@ def reset_table(
     tablename: str,
     create_query: str,
     insert_query: str,
-    rows: list[dict[str, str]] | None = None,
+    rows: Iterable[dict[str, object]] | None = None,
 ) -> None:
     cursor.execute(sql_drop_table(tablename))
     cursor.execute(create_query)
@@ -115,12 +117,11 @@ def save_representations(
     split: dict[str, list[str]],
     representations: dict,
 ) -> None:
-    embedding_rows = []
     model_embeddings = (
         (
             "frequency",
-            representations["tfidf_train"].toarray(),
-            representations["tfidf_test"].toarray(),
+            representations["tfidf_train"],
+            representations["tfidf_test"],
         ),
         (
             "static",
@@ -135,28 +136,51 @@ def save_representations(
     )
     texts = split["train_texts"] + split["test_texts"]
 
+    cursor.execute(sql_drop_table("dimEmbeddings"))
+    cursor.execute(CREATE_DIMENSION_EMBEDDINGS)
     for model_type, train_embeddings, test_embeddings in model_embeddings:
-        for text, embedding in zip(
-            texts,
-            np.concatenate((train_embeddings, test_embeddings)),
-        ):
-            embedding_rows.append(
-                {
-                    "text_sample": text,
-                    "embedding": json.dumps(embedding.tolist()),
-                    "model_type": model_type,
-                    "is_sparse": int(np.count_nonzero(embedding) < embedding.size / 2),
-                }
-            )
+        cursor.executemany(
+            INSERT_EMBEDDINGS,
+            _embedding_rows(
+                model_type,
+                texts,
+                train_embeddings,
+                test_embeddings,
+            ),
+        )
+    conn.commit()
 
-    reset_table(
-        conn,
-        cursor,
-        "dimEmbeddings",
-        CREATE_DIMENSION_EMBEDDINGS,
-        INSERT_EMBEDDINGS,
-        embedding_rows,
-    )
+
+def _embedding_rows(model_type, texts, train_embeddings, test_embeddings):
+    for text, embedding in zip(
+        texts,
+        _iter_embedding_rows(train_embeddings, test_embeddings),
+    ):
+        if issparse(embedding):
+            serialized_embedding = {
+                "size": embedding.shape[1],
+                "indices": embedding.indices.tolist(),
+                "values": embedding.data.tolist(),
+            }
+            is_sparse = True
+        else:
+            serialized_embedding = embedding.tolist()
+            is_sparse = np.count_nonzero(embedding) < embedding.size / 2
+        yield {
+            "text_sample": text,
+            "embedding": json.dumps(serialized_embedding),
+            "model_type": model_type,
+            "is_sparse": int(is_sparse),
+        }
+
+
+def _iter_embedding_rows(train_embeddings, test_embeddings):
+    for matrix in (train_embeddings, test_embeddings):
+        for row in matrix:
+            if issparse(row):
+                yield row.tocsr()
+            else:
+                yield np.asarray(row).ravel()
 
 
 def get_text_length_distribution(

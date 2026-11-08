@@ -34,6 +34,7 @@ from nlplib.features import extract_representations, stratified_text_split
 from nlplib.classification import run_emotion_classification
 from nlplib.config import EMOTIONS
 import pandas as pd
+from scipy.sparse import issparse
 #%%
 def main():
     #%%
@@ -156,21 +157,23 @@ def main():
         ("static", representations["static_train"], representations["static_test"]),
         ("contextual", representations["contextual_train"], representations["contextual_test"]),
     ):
-        train_array = (
-            train_features.toarray()
-            if hasattr(train_features, "toarray")
-            else train_features
+        train_size = train_features.shape[0] * train_features.shape[1]
+        test_size = test_features.shape[0] * test_features.shape[1]
+        train_nonzero = (
+            train_features.nnz
+            if issparse(train_features)
+            else (train_features != 0).sum()
         )
-        test_array = (
-            test_features.toarray()
-            if hasattr(test_features, "toarray")
-            else test_features
+        test_nonzero = (
+            test_features.nnz
+            if issparse(test_features)
+            else (test_features != 0).sum()
         )
         write_log(
             f"{representation_name} representation report statistics: "
-            f"dimensions={train_array.shape[1]}, "
-            f"train_sparsity={1 - (train_array != 0).mean():.4f}, "
-            f"test_sparsity={1 - (test_array != 0).mean():.4f}; "
+            f"dimensions={train_features.shape[1]}, "
+            f"train_sparsity={1 - train_nonzero / train_size:.4f}, "
+            f"test_sparsity={1 - test_nonzero / test_size:.4f}; "
             f"semantic_information={'surface term weighting' if representation_name == 'frequency' else 'distributional context' if representation_name == 'static' else 'contextual sentence semantics'}"
         )
 #%%
