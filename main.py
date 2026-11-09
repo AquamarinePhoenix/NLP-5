@@ -40,7 +40,6 @@ from nlplib.config import EMOTIONS
 from nlplib.statistics import log_text_length_statistics
 import pandas as pd
 from scipy.sparse import issparse
-#%%
 def main():
     #%%
     subprocess.run(
@@ -53,6 +52,7 @@ def main():
     clear_output_pngs()
     conn, cursor = get_connection()
     clear_database(conn, cursor)
+
     data = prepare_data()
     write_log(data)
 
