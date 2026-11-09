@@ -22,6 +22,23 @@ def get_connection() -> tuple[sqlite3.Connection, sqlite3.Cursor]:
     cursor = conn.cursor()
     return conn, cursor
 
+
+def clear_database(
+    conn: sqlite3.Connection,
+    cursor: sqlite3.Cursor,
+) -> None:
+    table_names = cursor.execute(
+        """
+        SELECT name
+        FROM sqlite_master
+        WHERE type = 'table' AND name NOT LIKE 'sqlite_%'
+        """
+    ).fetchall()
+    for (table_name,) in table_names:
+        cursor.execute(f'DELETE FROM "{table_name}"')
+    conn.commit()
+
+
 def reset_table(
     conn: sqlite3.Connection,
     cursor: sqlite3.Cursor,

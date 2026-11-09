@@ -12,7 +12,7 @@ from sklearn.metrics import (
     precision_score,
     recall_score,
 )
-
+from sklearn.tree import plot_tree
 from nlplib.log import write_log
 
 
@@ -148,6 +148,12 @@ def run_emotion_classification(
             n_jobs=-1,
         )
         forest.fit(train_features, split["train_labels"])
+        _plot_random_forest_tree(
+            forest,
+            train_features,
+            split["train_labels"],
+            representation_name,
+        )
         forest_predictions = forest.predict(test_features)
         forest_metrics = _classification_metrics(
             split["test_labels"],
@@ -294,3 +300,36 @@ def _plot_logistic_cumulative_distribution(
         dpi=150,
     )
     plt.close(figure)
+
+
+def _plot_random_forest_tree(
+    forest: RandomForestClassifier,
+    train_features,
+    train_labels: list[str],
+    representation_name: str,
+    output_directory: str = "data/output/random_forest",
+) -> None:
+    output_path = Path(output_directory)
+    output_path.mkdir(parents=True, exist_ok=True)
+    svg_path = output_path / f"random_forest_{representation_name}.svg"
+    feature_names = [
+        f"feature_{index}" for index in range(train_features.shape[1])
+    ]
+    figure = plt.figure(figsize=(24, 16))
+    plot_tree(
+        forest.estimators_[0],
+        max_depth=5,
+        feature_names=feature_names,
+        class_names=[str(class_name) for class_name in forest.classes_],
+        filled=True,
+        rounded=True,
+        impurity=False,
+    )
+    figure.suptitle(f"Random forest tree: {representation_name}")
+    figure.tight_layout()
+    figure.savefig(svg_path, format="svg")
+    plt.close(figure)
+    write_log(
+        f"Random forest visualization saved: {svg_path} "
+        "(first tree, displayed to depth 5)"
+    )
