@@ -33,13 +33,15 @@ from nlplib.transform import get_pos_distribution, perform_preprocess
 from nlplib.features import extract_representations, stratified_text_split
 from nlplib.classification import run_emotion_classification
 from nlplib.config import EMOTIONS
+from nlplib.statistics import log_text_length_statistics
 import pandas as pd
 from scipy.sparse import issparse
+
 #%%
 def main():
     #%%
     #1. Text dataset preparation
-    clear_log()
+    #clear_log()
     data = prepare_data()
     write_log(data)
 
@@ -99,6 +101,7 @@ def main():
     )
 
     distribution = get_text_length_distribution(conn, cursor)
+    log_text_length_statistics(distribution)
     plot_line_chart(
         "Text length distribution by emotion",
         "Text length",
