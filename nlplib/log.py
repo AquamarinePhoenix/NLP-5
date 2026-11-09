@@ -8,6 +8,17 @@ def clear_log(encoding: str | None = "utf-8") -> None:
     with open(LOG_FILE, "w", encoding = encoding) as f:
         f.write("")
 
+
+def clear_output_pngs() -> None:
+    output_directory = Path("data/output")
+    if not output_directory.exists():
+        return
+
+    for output_file in output_directory.rglob("*"):
+        if output_file.is_file() and output_file.suffix.lower() == ".png":
+            output_file.unlink()
+
+
 def write_log(text: str, encoding: str | None = "utf-8", skip_print: bool = False) -> None:
     Path(LOG_FILE).parent.mkdir(parents = True, exist_ok = True)
     with open(LOG_FILE, "a", encoding = encoding) as f:

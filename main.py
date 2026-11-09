@@ -1,8 +1,12 @@
 #%%
-from nlplib.log import clear_log, write_log
+import subprocess
+import sys
+
+from nlplib.log import clear_log, clear_output_pngs, write_log
 from nlplib.data import prepare_data
 from nlplib.db import (
     get_connection,
+    clear_database,
     reset_table,
     find_multiple_emotions,
     write_metadata,
@@ -35,15 +39,21 @@ from nlplib.classification import run_emotion_classification
 from nlplib.config import EMOTIONS
 import pandas as pd
 from scipy.sparse import issparse
-#%%
 def main():
     #%%
+    subprocess.run(
+        [sys.executable, "-m", "pip", "install", "-r", "requirements.txt"],
+        check=True,
+    )
+
     #1. Text dataset preparation
     clear_log()
+    clear_output_pngs()
+    conn, cursor = get_connection()
+    clear_database(conn, cursor)
+
     data = prepare_data()
     write_log(data)
-
-    conn, cursor = get_connection()
 
     reset_table(
         conn,
