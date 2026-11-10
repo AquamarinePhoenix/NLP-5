@@ -9,6 +9,7 @@ from scipy.sparse import issparse, vstack
 from collections import Counter, defaultdict
 from pathlib import Path
 from wordcloud import WordCloud
+from sklearn.decomposition import TruncatedSVD
 import umap
 from nlplib.config import COLORS
 
@@ -164,6 +165,20 @@ def plot_pos_distribution(
     plt.close(figure)
 
 
+def _prepare_umap_embeddings(embeddings):
+    if not issparse(embeddings):
+        return embeddings
+
+    max_components = min(50, embeddings.shape[0] - 1, embeddings.shape[1] - 1)
+    if max_components < 2:
+        return embeddings.toarray()
+
+    return TruncatedSVD(
+        n_components=max_components,
+        random_state=42,
+    ).fit_transform(embeddings)
+
+
 def plot_umap_representations(
     representations: dict,
     split: dict[str, list[str]],
@@ -191,6 +206,7 @@ def plot_umap_representations(
         if sample_count < 3:
             continue
 
+        embeddings = _prepare_umap_embeddings(embeddings)
         reducer = umap.UMAP(
             n_components=2,
             metric="cosine",
@@ -198,7 +214,7 @@ def plot_umap_representations(
             n_epochs=50,
             low_memory=True,
             angular_rp_forest=True,
-            n_jobs=-1,
+            n_jobs=1,
         )
         coordinates = reducer.fit_transform(embeddings)
         figure, axes = plt.subplots(figsize=(10, 7))
